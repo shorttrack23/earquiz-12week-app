@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>절대음감 퀴즈 v3.5.1 (오류 패치/클린 UI)</title>
+<style>
+  :root{
+    --bg:#f9fafb; --card:#ffffff; --fg:#0f172a; --muted:#64748b;
+    --border:#e5e7eb; --accent:#3b82f6; --accent-weak:#dbeafe;
+    --ok:#10b981; --err:#ef4444;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0b1020; --card:#12182a; --fg:#e5e7eb; --muted:#93a2bf; --border:#1f2740; --accent:#60a5fa; --accent-weak:#0b2a57; }
+  }
+  body.theme-dark{
+    --bg:#0b1020; --card:#12182a; --fg:#e5e7eb; --muted:#93a2bf; --border:#1f2740; --accent:#60a5fa; --accent-weak:#0b2a57;
+  }
+  *{ box-sizing: border-box; }
+  body{ margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", "Apple SD Gothic Neo", sans-serif; background:var(--bg); color:var(--fg); }
+  header{
+    position:sticky; top:0; z-index:50; backdrop-filter: blur(6px);
+    background: color-mix(in oklab, var(--card) 80%, transparent);
+    border-bottom:1px solid var(--border);
+  }
+  .container{ max-width:1100px; margin:0 auto; padding:12px 16px; }
+  .title-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  h1{ font-size:18px; margin:0; }
+  .toolbar{ display:flex; gap:8px; align-items:center; }
+  .btn{ border:1px solid var(--border); background:var(--card); color:var(--fg); padding:8px 12px; border-radius:10px; font-size:14px; cursor:pointer; }
+  .btn:hover{ border-color: var(--accent); }
+  .btn.primary{ background:var(--accent); color:#fff; border-color:transparent; }
+  .btn.ghost{ background:transparent; }
+  .chip{ padding:6px 10px; border:1px solid var(--border); border-radius:999px; font-size:12px; color:var(--muted); }
+  main .grid{ display:grid; grid-template-columns: 1fr; gap:12px; padding:12px 16px; }
+  @media (min-width: 980px){
+    main .grid{ grid-template-columns: 1.1fr 0.9fr; }
+  }
+  .card{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:12px; }
+  .card h2{ font-size:15px; margin:0 0 8px; color:var(--muted); }
+  .row{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:8px 0; }
+  label{ font-size:13px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+  select, input[type="range"], input[type="checkbox"]{ accent-color: var(--accent); }
+  details{ border:1px dashed var(--border); border-radius:12px; padding:8px; }
+  summary{ cursor:pointer; font-weight:600; color:var(--muted); }
+  /* Keys */
+  #keys{ display:grid; grid-template-columns: repeat(6, 1fr); gap:8px; }
+  .key{ padding:10px 8px; border:1px solid var(--border); border-radius:10px; background:var(--card); cursor:pointer; text-align:center; }
+  .key .note{ font-weight:700; font-size:14px; }
+  .key .sub{ font-size:11px; color:var(--muted); }
+  .key.natural{ background: var(--accent-weak); border-color: color-mix(in oklab, var(--accent) 40%, var(--border)); }
+  .key.acc{ background: var(--card); }
+  /* Progress */
+  .progress{ position:relative; height:10px; background:var(--border); border-radius:999px; overflow:hidden; }
+  .progress .bar{ position:absolute; inset:0 auto 0 0; width:0%; background:var(--accent); }
+  .progress-text{ font-size:12px; color:var(--muted); text-align:right; margin-top:6px; }
+  /* Toast */
+  #toast{ position:fixed; left:50%; bottom:16px; transform:translateX(-50%); background:var(--card); border:1px solid var(--border); padding:10px 12px; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.15); opacity:0; pointer-events:none; transition:opacity .18s ease; z-index:60; }
+  #toast.show{ opacity:1; }
+  #toast.ok{ border-color: color-mix(in oklab, var(--ok) 60%, var(--border)); }
+  #toast.err{ border-color: color-mix(in oklab, var(--err) 60%, var(--border)); }
+  /* Bottom action bar (mobile) */
+  .bottombar{ position:fixed; bottom:0; left:0; right:0; z-index:40; background: color-mix(in oklab, var(--card) 92%, transparent); border-top:1px solid var(--border); display:flex; gap:8px; padding:8px 12px; }
+  .bottombar .btn{ flex:1; }
+  @media (min-width: 980px){ .bottombar{ display:none; } }
+  /* Status text blocks */
+  #msg{ font-weight:600; }
+  #primeSeq, #score, #rt, #audioState{ font-size:13px; color:var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <div class="container title-row">
+    <h1>절대음감 퀴즈 v3.5.1</h1>
+    <div class="toolbar">
+      <span class="chip" id="todayChip">오늘</span>
+      <button class="btn" id="btnTheme">테마: 자동</button>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+  <div class="grid">
+    <!-- Left column -->
+    <section class="card">
+      <h2>세션</h2>
+      <div class="row">
+        <label>주차
+          <select id="week">
+            <option value="1">1주 (A, D)</option>
+            <option value="2">2주 (A, D, C, F#)</option>
+            <option value="3">3주 (+E, G#)</option>
+            <option value="4">4주 (+B, F)</option>
+            <option value="5">5주 (+C#, G)</option>
+            <option value="6">6주 (12음 완성)</option>
+            <option value="7">7주</option>
+            <option value="8">8주</option>
+            <option value="9">9주</option>
+            <option value="10">10주</option>
+            <option value="11">11주</option>
+            <option value="12">12주</option>
+          </select>
+        </label>
+        <label>요일
+          <select id="day">
+            <option value="1">Day 1</option>
+            <option value="2">Day 2</option>
+            <option value="3">Day 3</option>
+            <option value="4">Day 4</option>
+            <option value="5">Day 5</option>
+            <option value="6">Day 6</option>
+            <option value="7">Day 7(평가)</option>
+          </select>
+        </label>
+        <span id="dayTip" class="chip">오늘 포커스: 안정화</span>
+      </div>
+
+      <div class="row">
+        <button class="btn" id="btnUnlock">오디오 활성화</button>
+        <button class="btn" id="btnTest">사운드 테스트</button>
+        <label>볼륨 <input id="vol" type="range" min="0" max="100" value="34"></label>
+      </div>
+
+      <div class="row">
+        <button class="btn primary" id="btnPrimeToggle">프라이밍: OFF</button>
+        <button class="btn" id="btnOne">한 문제</button>
+        <button class="btn primary" id="btnQuizToggle">문제: OFF</button>
+        <button class="btn" id="btnStart20NF">무피드백 20문항(단발)</button>
+        <button class="btn" id="btnRepeat" disabled>방금 음 다시</button>
+        <button class="btn" id="btnReview" disabled>오답 3개 복습</button>
+      </div>
+
+      <details open>
+        <summary>출제/재생 옵션</summary>
+        <div class="row" style="margin-top:8px;">
+          <label>옥타브
+            <select id="oct">
+              <option value="4">고정 4</option>
+              <option value="3-5">랜덤 3–5</option>
+              <option value="2-5">랜덤 2–5</option>
+              <option value="2-6">랜덤 2–6</option>
+            </select>
+          </label>
+          <label><input type="checkbox" id="jumpGuard" checked> 상대음감 차단(연속 1옥↑)</label>
+          <button class="btn" id="btnJumpGuardToggle">상대음감 차단: ON</button>
+        </div>
+        <div class="row">
+          <label><input type="checkbox" id="octNormalize" checked> 옥타브 음량 보정</label>
+          <label>보정 강도
+            <select id="normStrength">
+              <option value="0.5">약</option>
+              <option value="1" selected>보통</option>
+              <option value="1.5">강</option>
+            </select>
+          </label>
+          <label>프리뷰 옥타브
+            <select id="previewOct">
+              <option value="3">3옥</option>
+              <option value="4" selected>4옥</option>
+              <option value="5">5옥</option>
+            </select>
+          </label>
+        </div>
+        <div class="row">
+          <label><input type="checkbox" id="autoNewBoost" checked> 신규음 가중치(1~6주)</label>
+          <label>강도
+            <select id="boostLevel">
+              <option value="1.5">×1.5</option>
+              <option value="2" selected>×2</option>
+              <option value="3">×3</option>
+            </select>
+          </label>
+          <label><input type="checkbox" id="errorBoost"> 오답 음 가중치</label>
+        </div>
+      </details>
+    </section>
+
+    <!-- Right column -->
+    <section class="card">
+      <h2>키(정답/프리뷰)</h2>
+      <div id="keys" class="row"></div>
+      <p class="muted">대기 상태에선 키를 누르면 해당 음이 즉시 재생됩니다. 진행 중엔 정답 입력으로 동작합니다.</p>
+    </section>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>진행 상황</h2>
+      <div id="msg"></div>
+      <div id="primeSeq" style="margin-top:6px;"></div>
+      <div class="progress" style="margin-top:10px;">
+        <div class="bar" id="progressBar"></div>
+      </div>
+      <div class="progress-text"><span id="progressText">0/20</span></div>
+      <div class="row" style="margin-top:8px;">
+        <div id="score"></div>
+        <div id="rt"></div>
+        <div id="audioState"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>통계/기록</h2>
+      <div class="row">
+        <button class="btn" id="btnShowStats">통계 보기/새로고침</button>
+        <button class="btn" id="btnExport">CSV 내보내기</button>
+        <button class="btn" id="btnClear">기록 초기화</button>
+      </div>
+      <div id="statsWrap" style="margin-top:6px;"></div>
+    </section>
+  </div>
+</main>
+
+<div class="bottombar">
+  <button class="btn primary" id="mbPrime">프라이밍</button>
+  <button class="btn primary" id="mbQuiz">문제</button>
+  <button class="btn" id="mbRepeat">다시</button>
+  <button class="btn" id="mbReview">복습</button>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* === 전역 오류 표시(즉시 진단용) === */
+(function(){
+  function showErr(t){
+    var el = document.getElementById('msg');
+    if(!el){
+      el = document.createElement('div');
+      el.id = 'msg';
+      document.body.prepend(el);
+    }
+    el.textContent = '오류: ' + t;
+    el.style.color = '#d33';
+  }
+  window.addEventListener('error', function(e){
+    showErr(e?.message || '알 수 없는 오류');
+    console.error('[window.error]', e);
+  });
+  window.addEventListener('unhandledrejection', function(e){
+    showErr((e?.reason && (e.reason.message || e.reason)) || 'Promise 오류');
+    console.error('[unhandledrejection]', e);
+  });
+})();
+
+/* ====== 데이터/상수 ====== */
+const noteOrder = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const solfegeSharp = { "C":"do","C#":"di","D":"re","D#":"ri","E":"mi","F":"fa","F#":"fi","G":"sol","G#":"si","A":"la","A#":"li","B":"ti" };
+const flatAlias   = { "C#":"Db","D#":"Eb","F#":"Gb","G#":"Ab","A#":"Bb" };
+const flatSolf    = { "C#":"ra","D#":"me","F#":"se","G#":"le","A#":"te" };
+const baseFreq4 = { "C":261.6256,"C#":277.1826,"D":293.6648,"D#":311.1270,"E":329.6276,"F":349.2282,"F#":369.9944,"G":391.9954,"G#":415.3047,"A":440.0000,"A#":466.1638,"B":493.8833 };
+const weeks = {
+  1:["A","D"],
+  2:["A","D","C","F#"],
+  3:["A","D","C","F#","E","G#"],
+  4:["A","D","C","F#","E","G#","B","F"],
+  5:["A","D","C","F#","E","G#","B","F","C#","G"],
+  6:["A","D","C","F#","E","G#","B","F","C#","G","D#","A#"],
+  7:["A","D","C","F#","E","G#","B","F","C#","G","D#","A#"],
+  8:["A","D","C","F#","E","G#","B","F","C#","G","D#","A#"],
+  9:["A","D","C","F#","E","G#","B","F","C#","G","D#","A#"],
+  10:["A","D","C","F#","E","G#","B","F","C#","G","D#","A#"],
+  11:["A","D","C","F#","E","G#","B","F","C#","G","D#","A#"],
+  12:["A","D","C","F#","E","G#","B","F","C#","G","D#","A#"]
+};
+const newByWeek = { 1:["A","D"], 2:["C","F#"], 3:["E","G#"], 4:["B","F"], 5:["C#","G"], 6:["D#","A#"] };
+const dayFocus = { 1:"안정화(신규음 맛보기)", 2:"신규음 비중↑", 3:"스피드(첫 느낌 2초)", 4:"라이트 테스트", 5:"혼동쌍 정리", 6:"변형 시작", 7:"평가(무피드백)" };
+const SINGLE_RATIO = 0.9;
+
+/* ====== 오디오 ====== */
+let audioCtx=null, masterGain=null, unlocked=false;
+function byId(id){ return document.getElementById(id); }
+function setText(id, t){ byId(id).textContent = t; }
+function updateAudioState(){ setText("audioState", `오디오 상태: ${audioCtx? audioCtx.state : "uninitialized"}`); }
+function ensureAudio(){
+  if(!audioCtx){
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = byId("vol").value/100 * 0.8;
+    masterGain.connect(audioCtx.destination);
+  }
+  if(audioCtx.state!=="running"){ audioCtx.resume().then(updateAudioState); } else updateAudioState();
+}
+function setMasterVolume(){
+  if(!masterGain || !audioCtx) return;
+  const v = byId("vol").value/100 * 0.8;
+  masterGain.gain.setTargetAtTime(v, audioCtx.currentTime, 0.01);
+}
+function timbreSpec(){ return { attack:0.01, release:0.12, filter:"lowpass", freq:12000, Q:0.8, drive:0.0 }; }
+function freqFor(base, oct){ const f4=baseFreq4[base]; return f4 ? f4*Math.pow(2, oct-4) : null; }
+function octaveBaseComp(o){ const map={2:1.20,3:1.08,4:1.00,5:0.92,6:0.86}; return map[o] ?? 1.0; }
+function octaveComp(o){ if(!byId("octNormalize").checked) return 1.0; const s=Number(byId("normStrength").value); return Math.pow(octaveBaseComp(o), s); }
+function playNoteBase(base, oct, dur=1.0){
+  ensureAudio();
+  const ac=audioCtx, t0=ac.currentTime, spec=timbreSpec(), comp=octaveComp(oct);
+  const osc = ac.createOscillator(); osc.type="sine"; osc.frequency.value = freqFor(base, oct);
+  const biq = ac.createBiquadFilter(); biq.type=spec.filter; biq.frequency.value=spec.freq; biq.Q.value=spec.Q;
+  const g = ac.createGain();
+  const a=spec.attack, r=spec.release;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(comp, t0+a);
+  g.gain.setValueAtTime(comp, t0 + Math.max(a, dur - r));
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(biq).connect(g).connect(masterGain);
+  osc.start(t0); osc.stop(t0 + dur + 0.03);
+}
+
+/* ====== 상태 ====== */
+let currentNote=null, lastNote=null;
+let in20=false, in20Paused=false, noFB=false, reviewQ=null;
+let q=0, okCnt=0, wrongCounts={}, rts=[], qStart=null, timer=null;
+
+let primingSeq=[], primingShown=[], primingIndex=0, primingTimer=null, primingRunning=false;
+
+/* ====== 유틸 ====== */
+function msg(t, good=null){
+  const el=byId("msg");
+  el.textContent=t;
+  el.style.color = good===true? "var(--ok)" : good===false? "var(--err)" : "var(--fg)";
+  showToast(t, good);
+}
+function today(){ const d=new Date(); const m=(d.getMonth()+1+"").padStart(2,"0"); const day=(d.getDate()+"").padStart(2,"0"); return `${d.getFullYear()}-${m}-${day}`; }
+function weekVal(){ return Number(byId("week").value); }
+function dayVal(){ return Number(byId("day").value); }
+function updateDayTip(){ const d=dayVal(); setText("dayTip", `오늘 포커스: ${dayFocus[d]||"안정화"}`); }
+function parseOctRange(){ const v=byId("oct").value; if(v==="4") return [4,4]; const [a,b]=v.split("-").map(Number); return [Math.min(a,b), Math.max(a,b)]; }
+function pickOct(){ const [lo,hi]=parseOctRange(); return lo + Math.floor(Math.random()*(hi-lo+1)); }
+function baseName(full){ return full.replace(/[0-9]/g,""); }
+function getOct(full){ const m=full.match(/[0-9]/); return m? Number(m[0]) : 4; }
+function choice(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function semitoneIndex(nb, oc){ return noteOrder.indexOf(nb) + 12*oc; }
+
+/* ====== 진행률 ====== */
+function setProgress(done, total=20){
+  const pct = Math.max(0, Math.min(100, Math.round(done/total*100)));
+  byId("progressBar").style.width = pct + "%";
+  setText("progressText", `${done}/${total}`);
+}
+
+/* ====== 토스트 ====== */
+let toastTimer=null;
+function showToast(text, good=null){
+  const t=byId("toast");
+  t.className="";
+  t.textContent = text;
+  t.classList.add("show");
+  if(good===true) t.classList.add("ok");
+  if(good===false) t.classList.add("err");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> t.classList.remove("show"), 1200);
+}
+
+/* ====== 가중/점프 ====== */
+function buildWeights(){
+  const w=weekVal(), d=dayVal(), pool=weeks[w], weights={};
+  if(w<=6 && byId("autoNewBoost").checked){
+    const mult=Number(byId("boostLevel").value);
+    (newByWeek[w]||[]).forEach(n=> weights[n]=(weights[n]||1)*mult);
+    if(d===2) (newByWeek[w]||[]).forEach(n=> weights[n]=(weights[n]||1)*1.2);
+  }
+  if(byId("errorBoost").checked){
+    const last = JSON.parse(localStorage.getItem("aeq_lastWrongCounts")||"{}");
+    const pairs = Object.entries(last).sort((a,b)=>b[1]-a[1]).slice(0,2);
+    pairs.forEach(([full,cnt])=>{
+      const nb=baseName(full);
+      if(weeks[w].includes(nb)) weights[nb]=(weights[nb]||1)+Math.min(2, Math.ceil(cnt/2));
+    });
+  }
+  return weights;
+}
+function pickWeighted(list, weightMap){ const bag=[]; list.forEach(n=>{ const w=Math.max(1, weightMap[n]||1); for(let i=0;i<w;i++) bag.push(n); }); return choice(bag); }
+function pickWithJumpFrom(nbList){
+  const force = byId("jumpGuard").checked;
+  let tries=0;
+  while(true){
+    let nb = choice(nbList);
+    let oc = pickOct();
+    if(force && lastNote){
+      const lastNB = baseName(lastNote), lastOC = getOct(lastNote);
+      const diff = Math.abs(semitoneIndex(nb, oc) - semitoneIndex(lastNB, lastOC));
+      if(diff < 12){
+        if(byId("oct").value==="4"){
+          oc = (Math.random()<0.5? 3:5);
+          const diff2 = Math.abs(semitoneIndex(nb, oc) - semitoneIndex(lastNB, lastOC));
+          if(diff2 >= 12) return nb+String(oc);
+        }
+        tries++; if(tries<50) continue;
+      }
+    }
+    return nb+String(oc);
+  }
+}
+
+/* ====== Day1·2 타깃 ====== */
+function getDayPrimary(){
+  const w=weekVal(), d=dayVal();
+  if(d!==1 && d!==2) return null;
+  if(w<=6){
+    const pair = newByWeek[w] || [];
+    if(pair.length>=2) return d===1 ? pair[0] : pair[1];
+    if(pair.length===1) return pair[0];
+    return weeks[w][0] || null;
+  } else {
+    const last = JSON.parse(localStorage.getItem("aeq_lastWrongCounts")||"{}");
+    const pool = weeks[w];
+    const top = Object.entries(last).map(([full,c])=>({ nb: baseName(full), c }))
+      .filter(x=> pool.includes(x.nb)).sort((a,b)=> b.c - a.c).map(x=> x.nb);
+    if(top.length>=2) return d===1 ? top[0] : top[1];
+    if(top.length===1) return top[0];
+    return choice(pool);
+  }
+}
+
+/* ====== 출제/세션 ====== */
+function nextQ(autoPlay=true){
+  if(in20 && in20Paused){ msg("일시정지 중입니다. '문제: ON'으로 재개하세요."); return; }
+  const w=weekVal(), d=dayVal(), pool=weeks[w];
+  let nb; const primary = getDayPrimary();
+  if((d===1 || d===2) && primary){
+    if(Math.random() < SINGLE_RATIO){
+      nb = primary;
+    } else {
+      const others = pool.filter(x=> x!==primary);
+      nb = others.length ? choice(others) : primary;
+    }
+  } else {
+    nb = pickWeighted(pool, buildWeights());
+  }
+  currentNote = pickWithJumpFrom([nb]);
+  msg("문제를 듣고 정답을 선택하세요.");
+  byId("btnRepeat").disabled=false;
+  if(autoPlay){ playNoteBase(baseName(currentNote), getOct(currentNote), 1.0); qStart = performance.now(); }
+}
+
+function setQuizToggleLabel(){
+  byId("btnQuizToggle").textContent = `문제: ${in20 && !in20Paused ? "ON" : "OFF"}`;
+  byId("mbQuiz").textContent = (in20 && !in20Paused)? "문제 중지" : "문제";
+}
+function start20(nf=false){
+  in20=true; in20Paused=false; noFB=!!nf; q=0; okCnt=0; wrongCounts={}; rts=[]; drawScore();
+  byId("btnReview").disabled=true; lastNote=null; setQuizToggleLabel(); nextQ(true);
+}
+function toggleQuiz(){
+  if(!in20){ // 시작
+    in20=true; noFB=false; in20Paused=false; q=0; okCnt=0; wrongCounts={}; rts=[]; drawScore(); byId("btnReview").disabled=true; lastNote=null; nextQ(true); setQuizToggleLabel(); return;
+  }
+  if(in20 && in20Paused){ // 재개
+    in20Paused=false; setQuizToggleLabel();
+    if(currentNote){ playNoteBase(baseName(currentNote), getOct(currentNote), 1.0); qStart=performance.now(); msg("재개합니다. 현재 문항에 답하세요."); }
+    else nextQ(true);
+    return;
+  }
+  if(in20 && !in20Paused){ // 일시정지
+    in20Paused=true; if(timer){ clearTimeout(timer); timer=null; } msg("문제 일시정지됨. '문제: ON'으로 재개하세요."); setQuizToggleLabel();
+  }
+}
+
+function answer(ansBase){
+  if(in20 && in20Paused){ msg("일시정지 중입니다. '문제: ON'으로 재개하세요."); return; }
+  if(!currentNote) return;
+  const now=performance.now(); if(qStart) rts.push(now - qStart);
+  const isOK = (ansBase===baseName(currentNote));
+  if(!isOK) wrongCounts[currentNote]=(wrongCounts[currentNote]||0)+1;
+  if(isOK) okCnt++; q++; drawScore();
+  if(in20){
+    if(!noFB) msg(isOK? `정답! (${currentNote})` : `오답… 정답은 ${currentNote}`, isOK); else msg(`응답 저장됨 (${q}/20)`);
+    if(timer) clearTimeout(timer);
+    lastNote = currentNote;
+    if(q>=20){
+      in20=false; in20Paused=false; setQuizToggleLabel();
+      localStorage.setItem("aeq_lastWrongCounts", JSON.stringify(wrongCounts));
+      endSummary();
+    } else {
+      timer=setTimeout(()=> nextQ(true), 650);
+    }
+  } else if(reviewQ){
+    msg(isOK? `정답! (${currentNote})` : `오답… 정답은 ${currentNote}`, isOK);
+    if(reviewQ.length===0){ byId("btnReview").disabled=false; msg("복습 종료!"); reviewQ=null; }
+    else { setTimeout(()=>{ currentNote=reviewQ.shift(); playNoteBase(baseName(currentNote), getOct(currentNote), 1.0); qStart=performance.now(); }, 600); }
+  } else {
+    msg(isOK? `정답! (${currentNote})` : `오답… 정답은 ${currentNote}`, isOK);
+  }
+}
+
+function drawScore(){
+  setText("score", in20? `진행: ${q}/20, 정답: ${okCnt}` : "");
+  const rtEl=byId("rt");
+  if(rts.length>0){ const avg=(rts.reduce((a,b)=>a+b,0)/rts.length)/1000; rtEl.textContent=`평균 RT: ${avg.toFixed(2)}s`; } else rtEl.textContent="";
+  setProgress(q, 20);
+}
+
+function endSummary(){
+  byId("btnRepeat").disabled=true;
+  const keys = Object.keys(wrongCounts);
+  const top3 = keys.sort((a,b)=> (wrongCounts[b]||0)-(wrongCounts[a]||0)).slice(0,3);
+  const txt = top3.length ? ` | 오답 Top3: ${top3.join(", ")}` : "";
+  msg(`세션 종료: 정답 ${okCnt}/20${txt}`); drawScore();
+  byId("btnReview").disabled = top3.length===0;
+  saveHistory({ date: today(), week: weekVal(), day: dayVal(), correct: okCnt, total: 20, avgRT: avgRT(), top3, oct: byId("oct").value, timbre:"fixed" });
+  renderStats();
+}
+
+/* ====== 복습 ====== */
+function startReview(){
+  const keys = Object.keys(wrongCounts);
+  const top3 = keys.sort((a,b)=> (wrongCounts[b]||0)-(wrongCounts[a]||0)).slice(0,3);
+  if(top3.length===0){ msg("복습할 항목이 없습니다."); return; }
+  const arr=[]; top3.forEach(n=>{ for(let i=0;i<3;i++) arr.push(n); });
+  for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+  reviewQ=arr; msg("오답 복습 시작(9문항)."); byId("btnReview").disabled=true;
+  currentNote=reviewQ.shift(); playNoteBase(baseName(currentNote), getOct(currentNote), 1.0); qStart=performance.now();
+}
+
+/* ====== 프라이밍 ON/OFF ====== */
+function buildPrimingSeq(){
+  const w=weekVal(), d=dayVal(), pool=weeks[w].slice(); const primary=getDayPrimary();
+  primingSeq=[]; primingShown=[]; primingIndex=0;
+  for(let i=0;i<10;i++){
+    let nb;
+    if((d===1||d===2) && primary) nb=(Math.random()<0.7)?primary:choice(pool.filter(x=>x!==primary));
+    else nb=choice(pool);
+    primingSeq.push(nb+String(pickOct()));
+  }
+}
+function setPrimingLabel(){
+  byId("btnPrimeToggle").textContent = `프라이밍: ${primingRunning ? "ON" : "OFF"}`;
+  byId("mbPrime").textContent = primingRunning? "프라이밍 중지" : "프라이밍";
+}
+function primingStep(){
+  if(!primingRunning) return;
+  if(primingIndex >= primingSeq.length){ primingRunning=false; setPrimingLabel(); msg("프라이밍 완료"); return; }
+  const cur=primingSeq[primingIndex]; const nb=baseName(cur), oc=getOct(cur);
+  primingShown.push(`${nb}${oc}`); setText("primeSeq", `프라이밍 진행: ${primingShown.join(" → ")}`);
+  playNoteBase(nb, oc, 1.0); primingIndex++; primingTimer = setTimeout(primingStep, 1400);
+}
+function togglePriming(){
+  if(primingRunning){
+    primingRunning=false; if(primingTimer){ clearTimeout(primingTimer); primingTimer=null; }
+    setPrimingLabel(); msg("프라이밍 일시정지됨. '프라이밍: ON'으로 재개하세요."); return;
+  }
+  if(primingSeq.length===0 || primingIndex>=primingSeq.length){ buildPrimingSeq(); primingShown=[]; setText("primeSeq",""); }
+  primingRunning=true; setPrimingLabel(); msg("프라이밍 중…"); primingStep();
+}
+
+/* ====== 키/라벨 ====== */
+function labelFor(n){
+  if(flatAlias[n]) return `<span class="note">${n}(${flatAlias[n]})</span><div class="sub">${solfegeSharp[n]}(${flatSolf[n]})</div>`;
+  return `<span class="note">${n}</span><div class="sub">${solfegeSharp[n]||""}</div>`;
+}
+function onKeyPress(ansBase){
+  if(in20 || reviewQ){ answer(ansBase); return; }
+  const oc = Number(byId("previewOct").value);
+  playNoteBase(ansBase, oc, 1.0);
+}
+function buildKeys(){
+  const wrap=byId("keys"); wrap.innerHTML="";
+  noteOrder.forEach(n=>{
+    const b=document.createElement("button");
+    b.className="key " + (n.includes("#")? "acc":"natural");
+    b.innerHTML=labelFor(n);
+    b.addEventListener("click", ()=> onKeyPress(n));
+    wrap.appendChild(b);
+  });
+}
+
+/* ====== 통계/CSV ====== */
+function avgRT(){ if(rts.length===0) return null; return +(rts.reduce((a,b)=>a+b,0)/rts.length/1000).toFixed(2); }
+function loadHistory(){ return JSON.parse(localStorage.getItem("aeq_history")||"[]"); }
+function saveHistory(rec){ const arr=loadHistory(); arr.push(rec); localStorage.setItem("aeq_history", JSON.stringify(arr)); }
+function clearHistory(){ localStorage.removeItem("aeq_history"); }
+function exportCSV(){
+  const rows = [["date","week","day","correct","total","avgRT","top3","oct","timbre"]];
+  loadHistory().forEach(r=> rows.push([r.date,r.week,r.day,r.correct,r.total,r.avgRT ?? "", (r.top3||[]).join(" "), r.oct, r.timbre]));
+  const csv = rows.map(r=> r.map(x=> `"${String(x).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"}); const url = URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download=`earquiz_stats_${today()}.csv`; a.click(); URL.revokeObjectURL(url);
+}
+function renderStats(){
+  const el=byId("statsWrap"); const data=loadHistory();
+  if(data.length===0){ el.innerHTML = '<div class="muted">아직 저장된 기록이 없습니다. 세션을 한 번 완료하면 자동 저장됩니다.</div>'; return; }
+  const byDate = {}; data.forEach(r=>{ (byDate[r.date]=byDate[r.date]||[]).push(r); });
+  const dates = Object.keys(byDate).sort(); const last7 = dates.slice(-7);
+  function avg(arr, key){ const xs=arr.map(o=> o[key]).filter(v=> typeof v==="number"); if(xs.length===0) return null; return xs.reduce((a,b)=>a+b,0)/xs.length; }
+  const lastRows = last7.map(d=>{ const arr=byDate[d]; const acc=avg(arr,"correct"); const rt=avg(arr,"avgRT"); return { d, acc: acc!=null? `${acc.toFixed(1)}/20`:"-", rt: rt!=null? `${rt.toFixed(2)}s`:"-" }; });
+  const byWeek = {}; data.forEach(r=>{ (byWeek[r.week]=byWeek[r.week]||[]).push(r); });
+  const weekRows = Object.keys(byWeek).sort((a,b)=>a-b).map(w=>{ const arr=byWeek[w]; const acc=avg(arr,"correct"); const rt=avg(arr,"avgRT"); return { w, acc: acc!=null? `${acc.toFixed(1)}/20`:"-", rt: rt!=null? `${rt.toFixed(2)}s`:"-" }; });
+  el.innerHTML = `
+    <table>
+      <thead><tr><th>최근 7일</th><th>평균 정답</th><th>평균 RT</th></tr></thead>
+      <tbody>${lastRows.map(r=> `<tr><td>${r.d}</td><td>${r.acc}</td><td>${r.rt}</td></tr>`).join("")}</tbody>
+    </table>
+    <table style="margin-top:10px;">
+      <thead><tr><th>주차</th><th>평균 정답</th><th>평균 RT</th></tr></thead>
+      <tbody>${weekRows.map(r=> `<tr><td>${r.w}</td><td>${r.acc}</td><td>${r.rt}</td></tr>`).join("")}</tbody>
+    </table>
+  `;
+}
+
+/* ====== 점프 차단 토글/단축키 ====== */
+function setJumpGuardState(on){
+  const cb = byId("jumpGuard"); const btn = byId("btnJumpGuardToggle");
+  cb.checked = !!on; btn.textContent = `상대음감 차단: ${on ? "ON" : "OFF"}`;
+  localStorage.setItem("aeq_jumpGuard", on ? "1" : "0");
+  msg(`상대음감 차단이 ${on ? "켜졌습니다" : "꺼졌습니다"}. (다음 문제부터 적용)`);
+}
+function initJumpGuardState(){
+  const saved = localStorage.getItem("aeq_jumpGuard");
+  const on = (saved===null) ? true : saved==="1";
+  setJumpGuardState(on);
+}
+
+/* ====== 테마 토글 ====== */
+function syncThemeBtn(){
+  const saved = localStorage.getItem("aeq_theme");
+  byId("btnTheme").textContent = saved==="dark" ? "테마: 다크" : saved==="light" ? "테마: 라이트" : "테마: 자동";
+}
+function applyTheme(mode){
+  document.body.classList.toggle("theme-dark", mode==="dark");
+  if(mode) localStorage.setItem("aeq_theme", mode); else localStorage.removeItem("aeq_theme");
+  syncThemeBtn();
+}
+function initTheme(){
+  const saved = localStorage.getItem("aeq_theme");
+  if(saved==="dark") document.body.classList.add("theme-dark");
+  if(saved==="light") document.body.classList.remove("theme-dark");
+  syncThemeBtn();
+}
+
+/* ====== 초기화 ====== */
+window.addEventListener("load", ()=>{
+  byId("week").value="1"; byId("day").value="1"; byId("oct").value="4";
+  updateDayTip(); buildKeys(); updateAudioState(); initJumpGuardState(); initTheme();
+  setText("todayChip", today());
+  setProgress(0,20);
+
+  byId("btnUnlock").addEventListener("click", ()=>{ ensureAudio(); unlocked=true; msg("오디오 활성화 완료!"); });
+  document.body.addEventListener("pointerdown", ()=>{ if(!unlocked){ ensureAudio(); unlocked=true; } }, { once:true });
+
+  byId("btnTest").addEventListener("click", ()=>{
+    ensureAudio(); const oc=4; const seq=["A","C#","E","A"]; let i=0; msg("사운드 테스트 중…");
+    (function step(){ if(i>=seq.length){ msg("테스트 완료. 시작해 보세요!"); return; } playNoteBase(seq[i], oc, 0.38); i++; setTimeout(step, 520); })();
+  });
+
+  byId("vol").addEventListener("input", ()=>{ ensureAudio(); setMasterVolume(); });
+  byId("week").addEventListener("change", ()=> msg("주차 변경됨."));
+  byId("day").addEventListener("change", updateDayTip);
+  byId("oct").addEventListener("change", ()=> msg("옥타브 범위 변경됨."));
+  byId("octNormalize").addEventListener("change", ()=> msg("옥타브 음량 보정 변경."));
+  byId("normStrength").addEventListener("change", ()=> msg("보정 강도 변경."));
+  byId("autoNewBoost").addEventListener("change", ()=> msg("신규음 가중치 변경."));
+  byId("boostLevel").addEventListener("change", ()=> msg("가중치 강도 변경."));
+  byId("errorBoost").addEventListener("change", ()=> msg("오답 가중치 변경."));
+
+  byId("btnPrimeToggle").addEventListener("click", togglePriming);
+  byId("btnOne").addEventListener("click", ()=>{
+    in20=false; in20Paused=false; noFB=false; q=0; okCnt=0; wrongCounts={}; rts=[]; drawScore(); byId("btnReview").disabled=true;
+    byId("primeSeq").textContent=""; setQuizToggleLabel(); nextQ(true);
+  });
+  byId("btnQuizToggle").addEventListener("click", toggleQuiz);
+  byId("btnStart20NF").addEventListener("click", ()=>{ byId("primeSeq").textContent=""; start20(true); });
+
+  byId("btnRepeat").addEventListener("click", ()=>{ if(currentNote){ playNoteBase(baseName(currentNote), getOct(currentNote), 1.0); qStart=performance.now(); } });
+  byId("btnReview").addEventListener("click", startReview);
+
+  byId("btnShowStats").addEventListener("click", renderStats);
+  byId("btnExport").addEventListener("click", exportCSV);
+  byId("btnClear").addEventListener("click", ()=>{ if(confirm("모든 기록을 삭제할까요?")){ clearHistory(); renderStats(); } });
+
+  byId("btnJumpGuardToggle").addEventListener("click", ()=>{
+    const now = byId("jumpGuard").checked; setJumpGuardState(!now);
+  });
+  window.addEventListener("keydown", (ev)=>{
+    if(ev.key.toLowerCase()==="j"){ const now = byId("jumpGuard").checked; setJumpGuardState(!now); }
+  });
+
+  // Mobile bottom bar shortcuts
+  byId("mbPrime").addEventListener("click", togglePriming);
+  byId("mbQuiz").addEventListener("click", toggleQuiz);
+  byId("mbRepeat").addEventListener("click", ()=>{ if(currentNote){ playNoteBase(baseName(currentNote), getOct(currentNote), 1.0); qStart=performance.now(); } });
+  byId("mbReview").addEventListener("click", startReview);
+
+  // Theme cycle: 자동 -> 라이트 -> 다크 -> 자동
+  byId("btnTheme").addEventListener("click", ()=>{
+    const saved = localStorage.getItem("aeq_theme");
+    if(!saved){ applyTheme("light"); }
+    else if(saved==="light"){ applyTheme("dark"); }
+    else { applyTheme(null); }
+  });
+});
+</script>
+</body>
+</html>
